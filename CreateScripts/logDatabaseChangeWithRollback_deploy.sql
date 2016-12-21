@@ -161,7 +161,7 @@ as
     and
       @changeStatusId = 100
   )begin
-    print 'Cannot update logDatabaseChange status to "Deploy - Queued" because an equal or higher version has already been successfully Deployed';
+    print 'Cannot update logDatabaseChange status to "Deploy - Queued" because an equal or higher version has already been successfully Deployed.';
     --throw 90000, 'Cannot update logDatabaseChange status to "Deploy - Queued" because this version has already been successfully Deployed', 1;
     return;
   end
@@ -180,7 +180,7 @@ as
     and
       @changeStatusId = 200
   )begin
-    print 'Cannot update logDatabaseChange status to "Rollback - Queued" because an equal or higher version has already been successfully Rolledback';
+    print 'Cannot update logDatabaseChange status to "Rollback - Queued" because an equal or higher version has already been successfully Rolledback.';
     --throw 90000, 'Cannot update logDatabaseChange status to "Rollback - Queued" because this version has already been successfully Rolledback', 1;
     return;
   end
@@ -199,7 +199,7 @@ as
     and
       @changeStatusId in (105, 110)
   )begin
-    print 'Cannot update logDatabaseChange status to "Deploy - Completed" because starting status is not "Deploy - Queued"';
+    print 'Cannot update logDatabaseChange status to "Deploy - Completed" because starting status is not "Deploy - Queued".';
     --throw 90000, 'Cannot update logDatabaseChange status to "Deploy - Completed" or "Deploy - Errored" because starting status is not "Deploy - Queued"', 1;
     return;
   end
@@ -218,7 +218,7 @@ as
     and
       @changeStatusId in (205, 210)
   )begin
-    print 'Cannot update logDatabaseChange status to "Rollback - Completed" because starting status is not "Rollback - Queued"';
+    print 'Cannot update logDatabaseChange status to "Rollback - Completed" because starting status is not "Rollback - Queued".';
     --throw 90001, 'Cannot update logDatabaseChange status to "Rollback - Completed" or "Rollback - Errored" because starting status is not "Rollback - Queued"', 1;
     return;
   end
@@ -263,6 +263,13 @@ create procedure dbo.logDatabaseChangeInsert(
 	@desc varchar(max) = null)
 as
 	set nocount on;
+
+  if not exists (select 1 from logDatabaseChangeContext where ExecutionContextId = @executionContextId) begin
+    declare @errorMsg varchar(500) = 'Cannot run change script because a record matching ExecutionContextId ' + cast(@executionContextId as varchar) + ' does not exist in the logDatabaseChangeContext table.';
+    print @errorMsg;
+    throw 90001, @errorMsg, 1
+    return;
+  end
 
   if exists (select 1 from logDatabaseChange where ChangeLogGuid = @guid and FileVersion = @version) begin
     exec logDatabaseChangeUpdate @guid, @version, @changeStatusId
@@ -322,7 +329,7 @@ as
 				and FileVersion >= @version
         and ChangeStatusId = 200
 		)begin
-       print 'Change script will not be Deployed as Rollback is Queued for an equal or higher version on ' + @@servername + '.' + db_name();
+       print 'Change script will not be Deployed as Rollback is Queued for an equal or higher version.'
        return 1; --denied
     end
 
@@ -337,7 +344,7 @@ as
             and ChangeStatusId = 110
 		)
 		begin
-    	print 'Change script will not be Deployed as an equal or higher version was successfully Deployed on ' + @@servername + '.' + db_name();
+    	print 'Change script will not be Deployed as an equal or higher version was successfully Deployed.';
       print 'If you have made updates to this script, please increment the version number and re-run the script.';
 			return 1; --denied
 		end;
@@ -395,7 +402,7 @@ as
 				and FileVersion >= @version
         and ChangeStatusId = 100
 		)begin
-       print 'Change script will not be Rolledback as Deploy is Queued for an equal or higher version on ' + @@servername + '.' + db_name();
+       print 'Change script will not be Rolledback as Deploy is Queued for an equal or higher version.';
        return 1; --denied
     end
 
@@ -410,7 +417,7 @@ as
 				and FileVersion > @version
         and ChangeStatusId = 110
 		) begin
-      print 'Changed script will not be Rolledback as a higher version of this change was successfully Deployed and not Rolledback on ' + @@servername + '.' + db_name();
+      print 'Change script will not be Rolledback as a higher version of this change was successfully Deployed and not Rolledback.';
       print 'If you have made updates to this script, please increment the version number and re-run the script.';
       return 1; --denied
     end
@@ -426,7 +433,7 @@ as
             and ChangeStatusId = 210
 		)
 		begin
-			print 'Changed script will not be Rolledback as this version was already successfully Rolledback on ' + @@servername + '.' + db_name();
+			print 'Change script will not be Rolledback as this version was already successfully Rolledback.';
       print 'If you have made updates to this script, please increment the version number and re-run the script.';
       return 1; --denied
 		end;

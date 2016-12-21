@@ -21,17 +21,26 @@
 --verify that message is 'Deploy has occurred' and version 2 is in table logDatabaseChange with ChangeStatusId of 110
 --select * from logDatabaseChange where ChangeLogGuid = 'E4055FD1-3C52-40B3-A56D-CF6086B32B44'
 
-declare @CanDeploy tinyint = 0, @Version tinyint = 1, @ChangeStatusId tinyint = 100, @ExecutingContextId int = 0;
-print 'Starting change script: VerifyDatabaseChangeLogic version ' + cast(@Version as varchar);
-exec logDatabaseChangeInsert 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @Version, @ChangeStatusId, @ExecutingContextId, 
-	'VerifyDatabaseChangeLogic.sql', 
-	'Test the logic for managing database changes';
-if object_id('tempdb..#Version') is not null begin drop table #Version; end
-create table #Version (currentVersion tinyint not null);
-insert #Version values (@Version);
-exec @CanDeploy = dbo.logCanDatabaseChangeBeDeployed 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @Version
-if (@CanDeploy != 0) begin
-	set noexec on --disable script execution
+begin try
+  declare @Version tinyint = 2, @ChangeStatusId tinyint = 100, @ExecutingContextId int = 0;
+  print 'Running change script on ' + @@servername + '.' + db_name() + ' - File: VerifyDatabaseChangeLogic.sql; ChangeLogGuid: E4055FD1-3C52-40B3-A56D-CF6086B32B44; Version: ' + cast(@Version as varchar);
+  exec logDatabaseChangeInsert 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @Version, @ChangeStatusId, @ExecutingContextId, 
+	  'VerifyDatabaseChangeLogic.sql', 
+	  'Test the logic for managing database changes';
+  if object_id('tempdb..#Version') is not null begin drop table #Version; end
+  create table #Version (currentVersion tinyint not null);
+  insert #Version values (@Version);
+end try
+begin catch
+  throw;
+end catch
+go
+
+declare @ReadOnlyVersion int, @CanDeploy tinyint = 0;
+if object_id('tempdb..#Version') is not null begin select top 1 @ReadOnlyVersion = currentVersion from #Version end
+exec @CanDeploy = dbo.logCanDatabaseChangeBeDeployed 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @ReadOnlyVersion
+if (@@error > 0 or @CanDeploy != 0) begin
+	set noexec on; --disable script execution
 end
 go
 
@@ -41,16 +50,16 @@ print 'Deploy has occurred'
 
 
 declare @ReadOnlyVersion int;
-select top 1 @ReadOnlyVersion = currentVersion from #Version
+if object_id('tempdb..#Version') is not null begin select top 1 @ReadOnlyVersion = currentVersion from #Version end
 exec logDatabaseChangeUpdate 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @ReadOnlyVersion, 110 --Deploy - Completed
-print 'Change script successfully Deployed on ' + @@servername + '.' + db_name();
+print 'Change script successfully Deployed'
 set noexec off
 go
 
 declare @CanRollback tinyint = 0, @ReadOnlyVersion int
-select top 1 @ReadOnlyVersion = currentVersion from #Version
+if object_id('tempdb..#Version') is not null begin select top 1 @ReadOnlyVersion = currentVersion from #Version end
 exec @CanRollback = dbo.logCanDatabaseChangeBeRolledBack 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @ReadOnlyVersion
-if (@CanRollback != 0) begin
+if (@@error > 0 or @CanRollback != 0) begin
   set noexec on --disable script execution
 end
 go
@@ -64,6 +73,6 @@ print 'Rollback has occurred'
 declare @ReadOnlyVersion int
 select top 1 @ReadOnlyVersion = currentVersion from #Version
 exec logDatabaseChangeUpdate 'E4055FD1-3C52-40B3-A56D-CF6086B32B44', @ReadOnlyVersion, 210 --Rollback - Completed
-print 'Change script successfully Rolledback on ' + @@servername + '.' + db_name();
+print 'Change script successfully Rolledback'
 set noexec off
-drop table #Version
+if object_id('tempdb..#Version') is not null begin drop table #Version end
