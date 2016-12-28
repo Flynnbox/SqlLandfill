@@ -1,3 +1,10 @@
+if exists (	select 1 from Information_Schema.Tables where TABLE_Name = 'logDatabaseChange') begin
+  if exists (select 1 from logDatabaseChange where ChangeLogGuid = 'F6F5AA6A-EA7C-414A-A14D-9B3D3FEF8D36' and FileVersion = 1 and ChangeStatusId = 110) begin
+    print 'Change script will not be Deployed as an equal or higher version was successfully Deployed.'
+    set noexec on;
+  end
+end
+
 set quoted_identifier off;
 go
 
@@ -465,11 +472,11 @@ insert into logDatabaseChangeStatus
 (ChangeStatusId, [Description])
 values
   (100, N'Deployment - Queued'),
-  (110, N'Deployment - Completed'),
   (105, N'Deployment - Errored'),
+  (110, N'Deployment - Completed'),
   (200, N'Rollback - Queued'),
-  (205, N'Rollback - Completed'),
-  (210, N'Rollback - Errored')
+  (205, N'Rollback - Errored'),
+  (210, N'Rollback - Completed')
 
 exec logDatabaseChangeInsert
 	'F6F5AA6A-EA7C-414A-A14D-9B3D3FEF8D36',
@@ -484,3 +491,5 @@ go
 
 set ansi_nulls off;
 go
+
+set noexec off;
